@@ -3,14 +3,14 @@ const SOURCE_HEIGHT = 745;
 
 // Koordinatlar, kaynak şemadaki gerçek ekipmanların kesileceği alanlardır.
 const EQUIPMENT = [
-  { id: "drain", name: "Boşaltma vanası", x: 124, y: 480, w: 33, h: 31, tolerance: 38 },
-  { id: "safety", name: "Emniyet ventili", x: 157, y: 480, w: 34, h: 40, tolerance: 38 },
-  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 500, w: 51, h: 59, tolerance: 42 },
-  { id: "air", name: "Hava tutucu", x: 296, y: 588, w: 39, h: 49, tolerance: 44 },
-  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216, tolerance: 48 },
-  { id: "dirt", name: "Tortu tutucu", x: 501, y: 681, w: 33, h: 55, tolerance: 44 },
-  { id: "filter", name: "Filtre", x: 534, y: 681, w: 37, h: 25, tolerance: 44 },
-  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54, tolerance: 48 }
+  { id: "drain", name: "Boşaltma vanası", x: 124, y: 480, w: 33, h: 31, crop: { x: 124, y: 486, w: 33, h: 27 } },
+  { id: "safety", name: "Emniyet ventili", x: 157, y: 480, w: 34, h: 40, crop: { x: 157, y: 486, w: 34, h: 34 } },
+  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 500, w: 51, h: 59, crop: { x: 130, y: 507, w: 47, h: 50 } },
+  { id: "air", name: "Hava tutucu", x: 296, y: 588, w: 39, h: 49, crop: { x: 297, y: 592, w: 38, h: 45 } },
+  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216 },
+  { id: "dirt", name: "Tortu tutucu", x: 501, y: 681, w: 33, h: 55 },
+  { id: "filter", name: "Filtre", x: 534, y: 681, w: 37, h: 25 },
+  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54 }
 ];
 
 // Oyun sırasında şema üzerinde cevabı açık eden ekipman yazıları kapatılır.
@@ -38,7 +38,8 @@ const state = {
   seconds: 0,
   timerId: null,
   hintId: null,
-  hinted: null
+  hinted: null,
+  selected: null
 };
 
 const ui = {
@@ -53,6 +54,7 @@ const ui = {
   hintBtn: document.querySelector("#hintBtn"),
   tray: document.querySelector("#pieces"),
   traySection: document.querySelector("#traySection"),
+  hotspotLayer: document.querySelector("#hotspotLayer"),
   feedback: document.querySelector("#dropFeedback"),
   modal: document.querySelector("#finishModal")
 };
@@ -62,6 +64,7 @@ ui.total.textContent = EQUIPMENT.length;
 image.addEventListener("load", () => {
   drawDiagram();
   createPieces();
+  createHotspots();
 });
 
 function drawDiagram() {
@@ -81,21 +84,9 @@ function drawDiagram() {
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,.97)";
     ctx.fillRect(item.x - pad, item.y - pad, item.w + pad * 2, item.h + pad * 2);
-    ctx.lineWidth = state.hinted === item.id ? 4 : 2;
-    ctx.strokeStyle = state.hinted === item.id ? "#e19a24" : "#0b6f68";
-    ctx.setLineDash(state.hinted === item.id ? [] : [7, 5]);
-    roundRect(ctx, item.x - pad, item.y - pad, item.w + pad * 2, item.h + pad * 2, 5);
-    ctx.stroke();
-    ctx.fillStyle = state.hinted === item.id ? "rgba(225,154,36,.12)" : "rgba(11,111,104,.06)";
-    ctx.fill();
-    ctx.setLineDash([]);
-    ctx.fillStyle = state.hinted === item.id ? "#a76d0d" : "#0b6f68";
-    ctx.font = "700 11px Inter, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(String(index + 1), item.x + item.w / 2, item.y + item.h / 2);
     ctx.restore();
   });
+  syncHotspots();
 }
 
 function roundRect(context, x, y, width, height, radius) {
@@ -114,9 +105,10 @@ function createPieces() {
     piece.setAttribute("aria-label", `${item.name} parçası`);
 
     const crop = document.createElement("canvas");
-    crop.width = item.w;
-    crop.height = item.h;
-    crop.getContext("2d").drawImage(image, item.x, item.y, item.w, item.h, 0, 0, item.w, item.h);
+    const source = item.crop ?? item;
+    crop.width = source.w;
+    crop.height = source.h;
+    crop.getContext("2d").drawImage(image, source.x, source.y, source.w, source.h, 0, 0, source.w, source.h);
     const label = document.createElement("span");
     label.textContent = item.name;
     piece.append(crop, label);
@@ -125,10 +117,42 @@ function createPieces() {
   });
 }
 
+function createHotspots() {
+  ui.hotspotLayer.replaceChildren();
+  EQUIPMENT.forEach((item, index) => {
+    const hotspot = document.createElement("button");
+    hotspot.type = "button";
+    hotspot.className = "hotspot";
+    hotspot.dataset.id = item.id;
+    hotspot.textContent = String(index + 1);
+    hotspot.setAttribute("aria-label", `${index + 1} numaralı ekipman yuvası`);
+    hotspot.style.left = `${item.x / SOURCE_WIDTH * 100}%`;
+    hotspot.style.top = `${item.y / SOURCE_HEIGHT * 100}%`;
+    hotspot.style.width = `${item.w / SOURCE_WIDTH * 100}%`;
+    hotspot.style.height = `${item.h / SOURCE_HEIGHT * 100}%`;
+    hotspot.addEventListener("click", () => placeSelectedIn(item));
+    ui.hotspotLayer.append(hotspot);
+  });
+  syncHotspots();
+}
+
+function syncHotspots() {
+  if (!ui.hotspotLayer) return;
+  ui.hotspotLayer.querySelectorAll(".hotspot").forEach((hotspot) => {
+    const id = hotspot.dataset.id;
+    hotspot.classList.toggle("placed", state.placed.has(id));
+    hotspot.classList.toggle("hint", state.hinted === id);
+    hotspot.classList.toggle("ready", Boolean(state.selected));
+  });
+}
+
 function addPointerDragging(piece, item) {
   let origin = null;
   let offsetX = 0;
   let offsetY = 0;
+  let startX = 0;
+  let startY = 0;
+  let moved = false;
 
   piece.addEventListener("pointerdown", (event) => {
     if (!state.started || state.placed.has(item.id)) return;
@@ -137,6 +161,9 @@ function addPointerDragging(piece, item) {
     const rect = piece.getBoundingClientRect();
     offsetX = event.clientX - rect.left;
     offsetY = event.clientY - rect.top;
+    startX = event.clientX;
+    startY = event.clientY;
+    moved = false;
     piece.style.left = `${rect.left}px`;
     piece.style.top = `${rect.top}px`;
     piece.classList.add("dragging");
@@ -146,39 +173,55 @@ function addPointerDragging(piece, item) {
 
   piece.addEventListener("pointermove", (event) => {
     if (!origin) return;
+    if (Math.hypot(event.clientX - startX, event.clientY - startY) > 7) moved = true;
     piece.style.left = `${event.clientX - offsetX}px`;
     piece.style.top = `${event.clientY - offsetY}px`;
   });
 
   piece.addEventListener("pointerup", (event) => {
     if (!origin) return;
-    const draggedRect = piece.getBoundingClientRect();
-    const dropX = draggedRect.left + draggedRect.width / 2;
-    const dropY = draggedRect.top + draggedRect.height / 2;
-    const pointerCorrect = isInsideTarget(event.clientX, event.clientY, item);
-    const centerCorrect = isInsideTarget(dropX, dropY, item);
-    const correct = pointerCorrect || centerCorrect;
+    const correct = isInsideTarget(event.clientX, event.clientY, item);
     piece.releasePointerCapture(event.pointerId);
     piece.classList.remove("dragging");
     piece.removeAttribute("style");
     if (origin.next && origin.next.parentNode === origin.parent) origin.parent.insertBefore(piece, origin.next);
     else origin.parent.append(piece);
     origin = null;
+    if (!moved) {
+      selectPiece(piece, item);
+      return;
+    }
     correct ? placePiece(piece, item) : rejectPiece(piece);
   });
 }
 
 function isInsideTarget(clientX, clientY, item) {
-  const rect = canvas.getBoundingClientRect();
-  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return false;
-  const x = (clientX - rect.left) * SOURCE_WIDTH / rect.width;
-  const y = (clientY - rect.top) * SOURCE_HEIGHT / rect.height;
-  const tolerance = item.tolerance ?? 42;
-  return x >= item.x - tolerance && x <= item.x + item.w + tolerance && y >= item.y - tolerance && y <= item.y + item.h + tolerance;
+  const hotspot = ui.hotspotLayer.querySelector(`[data-id="${item.id}"]`);
+  if (!hotspot) return false;
+  const rect = hotspot.getBoundingClientRect();
+  const tolerance = 18;
+  return clientX >= rect.left - tolerance && clientX <= rect.right + tolerance && clientY >= rect.top - tolerance && clientY <= rect.bottom + tolerance;
+}
+
+function selectPiece(piece, item) {
+  ui.tray.querySelectorAll(".piece.selected").forEach((entry) => entry.classList.remove("selected"));
+  state.selected = item.id;
+  piece.classList.add("selected");
+  ui.statusText.textContent = `${item.name} seçildi. Şemadaki doğru numaralı yuvaya tıkla.`;
+  syncHotspots();
+}
+
+function placeSelectedIn(target) {
+  if (!state.selected || state.placed.has(target.id)) return;
+  const item = EQUIPMENT.find((entry) => entry.id === state.selected);
+  const piece = ui.tray.querySelector(`[data-id="${state.selected}"]`);
+  if (item.id === target.id) placePiece(piece, item);
+  else rejectPiece(piece);
 }
 
 function placePiece(piece, item) {
   state.placed.add(item.id);
+  state.selected = null;
   state.score += 100;
   piece.classList.add("placed");
   showFeedback(`Doğru: ${item.name}`, "ok");
@@ -194,15 +237,17 @@ function rejectPiece(piece) {
   void piece.offsetWidth;
   piece.classList.add("wrong");
   showFeedback("Bu ekipmanın yeri burası değil", "error");
+  ui.statusText.textContent = `${piece.querySelector("span").textContent} seçili. Başka bir yuvayı dene.`;
   updateUI();
 }
 
 function startGame() {
   clearInterval(state.timerId);
   clearTimeout(state.hintId);
-  Object.assign(state, { started: true, finished: false, placed: new Set(), mistakes: 0, score: 0, seconds: 0, hinted: null });
+  Object.assign(state, { started: true, finished: false, placed: new Set(), mistakes: 0, score: 0, seconds: 0, hinted: null, selected: null });
   createPieces();
   ui.traySection.hidden = false;
+  ui.hotspotLayer.hidden = false;
   ui.hintBtn.disabled = false;
   ui.shuffleBtn.textContent = "Baştan Başla";
   ui.statusDot.className = "status-dot active";
