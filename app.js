@@ -1,0 +1,253 @@
+const SOURCE_WIDTH = 1260;
+const SOURCE_HEIGHT = 745;
+
+// Koordinatlar, kaynak şemadaki gerçek ekipmanların kesileceği alanlardır.
+const EQUIPMENT = [
+  { id: "drain", name: "Boşaltma vanası", x: 119, y: 463, w: 35, h: 39 },
+  { id: "safety", name: "Emniyet ventili", x: 158, y: 461, w: 39, h: 47 },
+  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 497, w: 51, h: 58 },
+  { id: "air", name: "Hava tutucu", x: 291, y: 566, w: 43, h: 70 },
+  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216 },
+  { id: "dirt", name: "Tortu tutucu", x: 481, y: 666, w: 45, h: 61 },
+  { id: "filter", name: "Filtre", x: 524, y: 670, w: 46, h: 50 },
+  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54 }
+];
+
+const canvas = document.querySelector("#diagram");
+const ctx = canvas.getContext("2d");
+const image = new Image();
+image.src = "assets/kazan-semasi.png";
+
+const state = {
+  started: false,
+  finished: false,
+  placed: new Set(),
+  mistakes: 0,
+  score: 0,
+  seconds: 0,
+  timerId: null,
+  hintId: null,
+  hinted: null
+};
+
+const ui = {
+  score: document.querySelector("#score"),
+  correct: document.querySelector("#correct"),
+  total: document.querySelector("#total"),
+  mistakes: document.querySelector("#mistakes"),
+  timer: document.querySelector("#timer"),
+  statusText: document.querySelector("#statusText"),
+  statusDot: document.querySelector("#statusDot"),
+  shuffleBtn: document.querySelector("#shuffleBtn"),
+  hintBtn: document.querySelector("#hintBtn"),
+  tray: document.querySelector("#pieces"),
+  traySection: document.querySelector("#traySection"),
+  feedback: document.querySelector("#dropFeedback"),
+  modal: document.querySelector("#finishModal")
+};
+
+ui.total.textContent = EQUIPMENT.length;
+
+image.addEventListener("load", () => {
+  drawDiagram();
+  createPieces();
+});
+
+function drawDiagram() {
+  ctx.clearRect(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+  ctx.drawImage(image, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
+  if (!state.started) return;
+
+  EQUIPMENT.forEach((item, index) => {
+    if (state.placed.has(item.id)) return;
+    const pad = 3;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,.97)";
+    ctx.fillRect(item.x - pad, item.y - pad, item.w + pad * 2, item.h + pad * 2);
+    ctx.lineWidth = state.hinted === item.id ? 4 : 2;
+    ctx.strokeStyle = state.hinted === item.id ? "#e19a24" : "#0b6f68";
+    ctx.setLineDash(state.hinted === item.id ? [] : [7, 5]);
+    roundRect(ctx, item.x - pad, item.y - pad, item.w + pad * 2, item.h + pad * 2, 5);
+    ctx.stroke();
+    ctx.fillStyle = state.hinted === item.id ? "rgba(225,154,36,.12)" : "rgba(11,111,104,.06)";
+    ctx.fill();
+    ctx.setLineDash([]);
+    ctx.fillStyle = state.hinted === item.id ? "#a76d0d" : "#0b6f68";
+    ctx.font = "700 11px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(index + 1), item.x + item.w / 2, item.y + item.h / 2);
+    ctx.restore();
+  });
+}
+
+function roundRect(context, x, y, width, height, radius) {
+  context.beginPath();
+  context.roundRect(x, y, width, height, radius);
+}
+
+function createPieces() {
+  ui.tray.replaceChildren();
+  shuffled(EQUIPMENT).forEach((item) => {
+    const piece = document.createElement("div");
+    piece.className = "piece";
+    piece.dataset.id = item.id;
+    piece.setAttribute("role", "button");
+    piece.setAttribute("tabindex", "0");
+    piece.setAttribute("aria-label", `${item.name} parçası`);
+
+    const crop = document.createElement("canvas");
+    crop.width = item.w;
+    crop.height = item.h;
+    crop.getContext("2d").drawImage(image, item.x, item.y, item.w, item.h, 0, 0, item.w, item.h);
+    const label = document.createElement("span");
+    label.textContent = item.name;
+    piece.append(crop, label);
+    addPointerDragging(piece, item);
+    ui.tray.append(piece);
+  });
+}
+
+function addPointerDragging(piece, item) {
+  let origin = null;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  piece.addEventListener("pointerdown", (event) => {
+    if (!state.started || state.placed.has(item.id)) return;
+    event.preventDefault();
+    origin = { parent: piece.parentNode, next: piece.nextSibling };
+    const rect = piece.getBoundingClientRect();
+    offsetX = event.clientX - rect.left;
+    offsetY = event.clientY - rect.top;
+    piece.style.left = `${rect.left}px`;
+    piece.style.top = `${rect.top}px`;
+    piece.classList.add("dragging");
+    document.body.append(piece);
+    piece.setPointerCapture(event.pointerId);
+  });
+
+  piece.addEventListener("pointermove", (event) => {
+    if (!origin) return;
+    piece.style.left = `${event.clientX - offsetX}px`;
+    piece.style.top = `${event.clientY - offsetY}px`;
+  });
+
+  piece.addEventListener("pointerup", (event) => {
+    if (!origin) return;
+    const correct = isInsideTarget(event.clientX, event.clientY, item);
+    piece.releasePointerCapture(event.pointerId);
+    piece.classList.remove("dragging");
+    piece.removeAttribute("style");
+    if (origin.next && origin.next.parentNode === origin.parent) origin.parent.insertBefore(piece, origin.next);
+    else origin.parent.append(piece);
+    origin = null;
+    correct ? placePiece(piece, item) : rejectPiece(piece);
+  });
+}
+
+function isInsideTarget(clientX, clientY, item) {
+  const rect = canvas.getBoundingClientRect();
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return false;
+  const x = (clientX - rect.left) * SOURCE_WIDTH / rect.width;
+  const y = (clientY - rect.top) * SOURCE_HEIGHT / rect.height;
+  const tolerance = 22;
+  return x >= item.x - tolerance && x <= item.x + item.w + tolerance && y >= item.y - tolerance && y <= item.y + item.h + tolerance;
+}
+
+function placePiece(piece, item) {
+  state.placed.add(item.id);
+  state.score += 100;
+  piece.classList.add("placed");
+  showFeedback(`Doğru: ${item.name}`, "ok");
+  updateUI();
+  drawDiagram();
+  if (state.placed.size === EQUIPMENT.length) finishGame();
+}
+
+function rejectPiece(piece) {
+  state.mistakes += 1;
+  state.score = Math.max(0, state.score - 15);
+  piece.classList.remove("wrong");
+  void piece.offsetWidth;
+  piece.classList.add("wrong");
+  showFeedback("Bu ekipmanın yeri burası değil", "error");
+  updateUI();
+}
+
+function startGame() {
+  clearInterval(state.timerId);
+  clearTimeout(state.hintId);
+  Object.assign(state, { started: true, finished: false, placed: new Set(), mistakes: 0, score: 0, seconds: 0, hinted: null });
+  createPieces();
+  ui.traySection.hidden = false;
+  ui.hintBtn.disabled = false;
+  ui.shuffleBtn.textContent = "Baştan Başla";
+  ui.statusDot.className = "status-dot active";
+  ui.statusText.textContent = "Şema bozuldu. Sekiz ekipmanı doğru yuvalarına yerleştir.";
+  ui.modal.hidden = true;
+  state.timerId = setInterval(() => { state.seconds += 1; updateUI(); }, 1000);
+  updateUI();
+  drawDiagram();
+  setTimeout(() => ui.traySection.scrollIntoView({ behavior: "smooth", block: "nearest" }), 120);
+}
+
+function showHint() {
+  const remaining = EQUIPMENT.filter((item) => !state.placed.has(item.id));
+  if (!remaining.length) return;
+  clearTimeout(state.hintId);
+  state.hinted = remaining[Math.floor(Math.random() * remaining.length)].id;
+  state.score = Math.max(0, state.score - 20);
+  const item = EQUIPMENT.find((entry) => entry.id === state.hinted);
+  ui.statusText.textContent = `İpucu: ${item.name} için parlayan yuvaya bak.`;
+  updateUI();
+  drawDiagram();
+  state.hintId = setTimeout(() => {
+    state.hinted = null;
+    ui.statusText.textContent = "Parçaları doğru yuvalarına yerleştir.";
+    drawDiagram();
+  }, 2200);
+}
+
+function finishGame() {
+  state.finished = true;
+  clearInterval(state.timerId);
+  state.score += Math.max(0, 300 - state.seconds) + Math.max(0, 100 - state.mistakes * 10);
+  ui.hintBtn.disabled = true;
+  ui.statusDot.className = "status-dot success";
+  ui.statusText.textContent = "Tebrikler! Kazan altı tesisat şemasını tamamladın.";
+  updateUI();
+  document.querySelector("#finalScore").textContent = state.score;
+  document.querySelector("#finalTime").textContent = formatTime(state.seconds);
+  document.querySelector("#finalMistakes").textContent = state.mistakes;
+  document.querySelector("#finishSummary").textContent = state.mistakes === 0
+    ? "Kusursuz montaj — bütün ekipmanları ilk denemede buldun."
+    : `${EQUIPMENT.length} ekipmanı ${state.mistakes} hatayla doğru konumlarına yerleştirdin.`;
+  setTimeout(() => { ui.modal.hidden = false; }, 450);
+}
+
+function updateUI() {
+  ui.score.textContent = state.score;
+  ui.correct.textContent = state.placed.size;
+  ui.mistakes.textContent = state.mistakes;
+  ui.timer.textContent = formatTime(state.seconds);
+}
+
+function formatTime(seconds) {
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function showFeedback(message, type) {
+  ui.feedback.textContent = message;
+  ui.feedback.className = `drop-feedback show ${type}`;
+  clearTimeout(showFeedback.timeout);
+  showFeedback.timeout = setTimeout(() => { ui.feedback.className = "drop-feedback"; }, 1300);
+}
+
+function shuffled(list) {
+  return [...list].sort(() => Math.random() - .5);
+}
+
+ui.shuffleBtn.addEventListener("click", startGame);
+ui.hintBtn.addEventListener("click", showHint);
+document.querySelector("#playAgainBtn").addEventListener("click", startGame);

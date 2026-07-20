@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b6f68" />
+    <meta name="description" content="Kazan altı tesisat ekipmanlarını sürükle-bırak yöntemiyle öğrenin." />
+    <title>Kazan Altı Montaj Oyunu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Ana sayfa">
+        <span class="brand-mark">EA</span>
+        <span><strong>EREM</strong> AKADEMİ</span>
+      </a>
+      <span class="course-label">Teknik Eğitim</span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">İNTERAKTİF ÖĞRENME</span>
+          <h1>Kazan Altı Montaj Oyunu</h1>
+          <p>Ekipmanları doğru tesisat konumlarına sürükleyip bırakarak şemayı yeniden tamamla.</p>
+        </div>
+        <div class="stats" aria-label="Oyun istatistikleri">
+          <div><span>Puan</span><strong id="score">0</strong></div>
+          <div><span>Doğru</span><strong><b id="correct">0</b>/<b id="total">8</b></strong></div>
+          <div><span>Hata</span><strong id="mistakes">0</strong></div>
+          <div><span>Süre</span><strong id="timer">00:00</strong></div>
+        </div>
+      </section>
+
+      <section class="game-card">
+        <div class="toolbar">
+          <div class="status-wrap">
+            <span class="status-dot" id="statusDot"></span>
+            <p id="statusText">Şema hazır. Oyuna başlamak için “Şemayı Boz” butonuna bas.</p>
+          </div>
+          <div class="actions">
+            <button class="button button-secondary" id="hintBtn" disabled>İpucu Göster</button>
+            <button class="button button-primary" id="shuffleBtn">Şemayı Boz</button>
+          </div>
+        </div>
+
+        <div class="diagram-shell" id="diagramShell">
+          <canvas id="diagram" width="1260" height="745" aria-label="Kazan tesisat şeması"></canvas>
+          <div class="drop-feedback" id="dropFeedback" aria-live="polite"></div>
+        </div>
+
+        <div class="tray-section" id="traySection" hidden>
+          <div class="tray-heading">
+            <div>
+              <span class="step-number">2</span>
+              <h2>Parçaları doğru yerlerine sürükle</h2>
+            </div>
+            <p>Parçaya basılı tut ve şemadaki kesik çizgili yuvasına bırak.</p>
+          </div>
+          <div class="pieces" id="pieces"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal" id="finishModal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="finishTitle">
+        <div class="trophy">✓</div>
+        <span class="eyebrow">EĞİTİM TAMAMLANDI</span>
+        <h2 id="finishTitle">Tesisatı başarıyla tamamladın!</h2>
+        <p id="finishSummary"></p>
+        <div class="result-grid">
+          <div><span>Puan</span><strong id="finalScore">0</strong></div>
+          <div><span>Süre</span><strong id="finalTime">00:00</strong></div>
+          <div><span>Hata</span><strong id="finalMistakes">0</strong></div>
+        </div>
+        <button class="button button-primary button-wide" id="playAgainBtn">Tekrar Oyna</button>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
