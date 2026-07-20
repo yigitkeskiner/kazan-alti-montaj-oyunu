@@ -12,4 +12,4 @@ Ardından `http://localhost:8080` adresini açın.
 
 ## Yayınlama
 
-`main` dalına yapılan her gönderim, `.github/workflows/deploy-pages.yml` iş akışıyla GitHub Pages'e otomatik olarak yayınlanır. GitHub deposunda **Settings → Pages → Source** alanının **GitHub Actions** olarak seçilmesi yeterlidir.
+`main` dalına yapılan her gönderim, `.github/workflows/deploy-pages.yml` iş akışıyla GitHub Pages'e otomatik olarak yayınlanır. İş akışı, ilk çalışmasında GitHub Pages'i de otomatik olarak etkinleştirir.
