@@ -3,14 +3,25 @@ const SOURCE_HEIGHT = 745;
 
 // Koordinatlar, kaynak şemadaki gerçek ekipmanların kesileceği alanlardır.
 const EQUIPMENT = [
-  { id: "drain", name: "Boşaltma vanası", x: 119, y: 463, w: 35, h: 39 },
-  { id: "safety", name: "Emniyet ventili", x: 158, y: 461, w: 39, h: 47 },
-  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 497, w: 51, h: 58 },
-  { id: "air", name: "Hava tutucu", x: 291, y: 566, w: 43, h: 70 },
-  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216 },
-  { id: "dirt", name: "Tortu tutucu", x: 481, y: 666, w: 45, h: 61 },
-  { id: "filter", name: "Filtre", x: 524, y: 670, w: 46, h: 50 },
-  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54 }
+  { id: "drain", name: "Boşaltma vanası", x: 124, y: 480, w: 33, h: 31, tolerance: 38 },
+  { id: "safety", name: "Emniyet ventili", x: 157, y: 480, w: 34, h: 40, tolerance: 38 },
+  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 500, w: 51, h: 59, tolerance: 42 },
+  { id: "air", name: "Hava tutucu", x: 296, y: 588, w: 39, h: 49, tolerance: 44 },
+  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216, tolerance: 48 },
+  { id: "dirt", name: "Tortu tutucu", x: 501, y: 681, w: 33, h: 55, tolerance: 44 },
+  { id: "filter", name: "Filtre", x: 534, y: 681, w: 37, h: 25, tolerance: 44 },
+  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54, tolerance: 48 }
+];
+
+// Oyun sırasında şema üzerinde cevabı açık eden ekipman yazıları kapatılır.
+const ANSWER_LABELS = [
+  { id: "drain", x: 112, y: 464, w: 46, h: 20 },
+  { id: "safety", x: 157, y: 464, w: 44, h: 20 },
+  { id: "air", x: 286, y: 565, w: 54, h: 25 },
+  { id: "separator", x: 337, y: 550, w: 35, h: 104 },
+  { id: "dirt", x: 480, y: 657, w: 57, h: 24 },
+  { id: "filter", x: 535, y: 662, w: 48, h: 21 },
+  { id: "system-pump", x: 617, y: 378, w: 68, h: 36 }
 ];
 
 const canvas = document.querySelector("#diagram");
@@ -57,6 +68,12 @@ function drawDiagram() {
   ctx.clearRect(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
   ctx.drawImage(image, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT);
   if (!state.started) return;
+
+  ANSWER_LABELS.forEach((label) => {
+    if (state.placed.has(label.id)) return;
+    ctx.fillStyle = "rgba(255,255,255,.98)";
+    ctx.fillRect(label.x, label.y, label.w, label.h);
+  });
 
   EQUIPMENT.forEach((item, index) => {
     if (state.placed.has(item.id)) return;
@@ -135,7 +152,12 @@ function addPointerDragging(piece, item) {
 
   piece.addEventListener("pointerup", (event) => {
     if (!origin) return;
-    const correct = isInsideTarget(event.clientX, event.clientY, item);
+    const draggedRect = piece.getBoundingClientRect();
+    const dropX = draggedRect.left + draggedRect.width / 2;
+    const dropY = draggedRect.top + draggedRect.height / 2;
+    const pointerCorrect = isInsideTarget(event.clientX, event.clientY, item);
+    const centerCorrect = isInsideTarget(dropX, dropY, item);
+    const correct = pointerCorrect || centerCorrect;
     piece.releasePointerCapture(event.pointerId);
     piece.classList.remove("dragging");
     piece.removeAttribute("style");
@@ -151,7 +173,7 @@ function isInsideTarget(clientX, clientY, item) {
   if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return false;
   const x = (clientX - rect.left) * SOURCE_WIDTH / rect.width;
   const y = (clientY - rect.top) * SOURCE_HEIGHT / rect.height;
-  const tolerance = 22;
+  const tolerance = item.tolerance ?? 42;
   return x >= item.x - tolerance && x <= item.x + item.w + tolerance && y >= item.y - tolerance && y <= item.y + item.h + tolerance;
 }
 
