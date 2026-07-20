@@ -3,14 +3,14 @@ const SOURCE_HEIGHT = 745;
 
 // Koordinatlar, kaynak şemadaki gerçek ekipmanların kesileceği alanlardır.
 const EQUIPMENT = [
-  { id: "drain", name: "Boşaltma vanası", x: 124, y: 480, w: 33, h: 31, crop: { x: 124, y: 486, w: 33, h: 27 } },
-  { id: "safety", name: "Emniyet ventili", x: 157, y: 480, w: 34, h: 40, crop: { x: 157, y: 486, w: 34, h: 34 } },
-  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 500, w: 51, h: 59, crop: { x: 130, y: 507, w: 47, h: 50 } },
-  { id: "air", name: "Hava tutucu", x: 296, y: 588, w: 39, h: 49, crop: { x: 297, y: 592, w: 38, h: 45 } },
-  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216 },
-  { id: "dirt", name: "Tortu tutucu", x: 501, y: 681, w: 33, h: 55 },
-  { id: "filter", name: "Filtre", x: 534, y: 681, w: 37, h: 25 },
-  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54 }
+  { id: "drain", name: "Boşaltma vanası", x: 124, y: 480, w: 33, h: 31, crop: { x: 124, y: 486, w: 33, h: 27 }, slot: { x: 118, y: 473, w: 38, h: 37 } },
+  { id: "safety", name: "Emniyet ventili", x: 157, y: 480, w: 34, h: 40, crop: { x: 157, y: 486, w: 34, h: 34 }, slot: { x: 157, y: 473, w: 38, h: 45 } },
+  { id: "boiler-pump", name: "Kazan pompası", x: 128, y: 500, w: 51, h: 59, crop: { x: 130, y: 507, w: 47, h: 50 }, slot: { x: 127, y: 519, w: 53, h: 48 } },
+  { id: "air", name: "Hava tutucu", x: 296, y: 588, w: 39, h: 49, crop: { x: 297, y: 592, w: 38, h: 45 }, slot: { x: 286, y: 581, w: 54, h: 61 } },
+  { id: "separator", name: "Denge kabı", x: 341, y: 516, w: 44, h: 216, slot: { x: 337, y: 510, w: 52, h: 225 } },
+  { id: "dirt", name: "Tortu tutucu", x: 501, y: 681, w: 33, h: 55, slot: { x: 493, y: 676, w: 40, h: 62 } },
+  { id: "filter", name: "Filtre", x: 534, y: 681, w: 37, h: 25, slot: { x: 535, y: 676, w: 46, h: 42 } },
+  { id: "system-pump", name: "Isıtma devresi pompası", x: 582, y: 437, w: 46, h: 54, slot: { x: 576, y: 430, w: 60, h: 66 } }
 ];
 
 // Oyun sırasında şema üzerinde cevabı açık eden ekipman yazıları kapatılır.
@@ -79,6 +79,7 @@ function drawDiagram() {
   });
 
   EQUIPMENT.forEach((item, index) => {
+    const slot = item.slot ?? item;
     if (state.placed.has(item.id)) return;
     const pad = 3;
     ctx.save();
@@ -126,10 +127,10 @@ function createHotspots() {
     hotspot.dataset.id = item.id;
     hotspot.textContent = String(index + 1);
     hotspot.setAttribute("aria-label", `${index + 1} numaralı ekipman yuvası`);
-    hotspot.style.left = `${item.x / SOURCE_WIDTH * 100}%`;
-    hotspot.style.top = `${item.y / SOURCE_HEIGHT * 100}%`;
-    hotspot.style.width = `${item.w / SOURCE_WIDTH * 100}%`;
-    hotspot.style.height = `${item.h / SOURCE_HEIGHT * 100}%`;
+    hotspot.style.left = `${slot.x / SOURCE_WIDTH * 100}%`;
+    hotspot.style.top = `${slot.y / SOURCE_HEIGHT * 100}%`;
+    hotspot.style.width = `${slot.w / SOURCE_WIDTH * 100}%`;
+    hotspot.style.height = `${slot.h / SOURCE_HEIGHT * 100}%`;
     hotspot.addEventListener("click", () => placeSelectedIn(item));
     ui.hotspotLayer.append(hotspot);
   });
